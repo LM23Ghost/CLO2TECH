@@ -255,6 +255,7 @@ function MapView({ area, points }) {
 function App() {
 	const [reports, setReports] = React.useState([]);
 	const [summary, setSummary] = React.useState({ open: 0, inProgress: 0, resolved: 0, averageResolutionHours: 0 });
+	const [metricsUpdatedAt, setMetricsUpdatedAt] = React.useState(null);
 	const [areas, setAreas] = React.useState([]);
 	const [selectedArea, setSelectedArea] = React.useState('all');
 	const [heatmap, setHeatmap] = React.useState([]);
@@ -279,6 +280,7 @@ function App() {
 		setReports((await reportsResponse.json()).data);
 		setSummary((await summaryResponse.json()).data);
 		setHeatmap((await heatmapResponse.json()).data);
+		setMetricsUpdatedAt(Date.now());
 	};
 
 	React.useEffect(() => {
@@ -362,7 +364,7 @@ function App() {
 		{showMunicipalityUpdates && <MunicipalityUpdatePanel token={municipalityToken} onClose={() => setShowMunicipalityUpdates(false)} />}
 		{locationSuggestion && <div className="location-suggestion"><div><strong>You appear to be in {locationSuggestion.name}.</strong><span>Want to view local service reports?</span></div><button onClick={() => { selectArea(locationSuggestion.id); setLocationSuggestion(null); }}>Switch area</button><button className="dismiss" onClick={() => setLocationSuggestion(null)}>Keep current</button></div>}
 		<section className="intro"><div><p className="eyebrow">{selectedAreaDetails.subtitle}</p><h1>{selectedAreaDetails.name === 'All service areas' ? <>Make the work<br /><span>visible.</span></> : <>{selectedAreaDetails.name}<br /><span>in view.</span></>}</h1><p className="lede">A shared operating picture for residents and the teams responsible for keeping {selectedAreaDetails.name.toLowerCase()} moving.</p></div><div className="live"><span className="pulse" /> Live operations desk <small>Updated just now</small></div></section>
-		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div></section>
+		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div><small className="metrics-live"><i /> Live · {metricsUpdatedAt ? `updated ${now - metricsUpdatedAt < 60000 ? 'just now' : `${formatElapsed(new Date(metricsUpdatedAt).toISOString(), now)} ago`}` : 'syncing'}</small></section>
 		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p>{report.reason && <small className="report-reason">Reason: {report.reason}</small>}{report.updates?.[0] && <small className="report-update">Update: {report.updates[0].message}</small>}<small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span>{report.community?.confirmed > 0 && report.community.confirmed > (report.community.unresolved ?? 0) ? <span className="community-confirmed" title="Community confirmation">✓</span> : <button className="community-button icon-check" aria-label="Open community check" title="Open community check" onClick={() => setCommunityReport(report)}>—</button>}</article>)}</div></section>
 		<AreaCommunity area={selectedArea} user={user} municipalityToken={municipalityToken} />
 		<footer>Cloud2Tech Civic Systems <span>Transparency by default</span></footer>
