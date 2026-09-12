@@ -44,3 +44,7 @@
 | GET | `/api/v1/dashboard/heatmap` | Read map aggregation data |
 | POST | `/api/v1/workflow/route` | Route a report to a department |
 | GET | `/api/v1/reporting/transparency` | Generate transparency metrics |
+| GET | `/api/v1/municipality/research` | Read aggregate research data, area/category breakdowns, and report register |
+| POST | `/api/v1/municipality/notifications/broadcast` | Queue an email notification for all registered residents |
+
+Municipal report records include `loggedAt` (ISO 8601 UTC). Open reports expose elapsed time from `loggedAt`; resolved reports include `resolvedHours`. Broadcasts currently enter an in-memory queue and return the recipient count. Connect the queue to Azure Communication Services, SendGrid, or another SMTP provider for production delivery.

@@ -6,6 +6,16 @@ import './styles.css';
 
 const api = 'http://localhost:4003/api/v1';
 
+const formatElapsed = (timestamp, now = Date.now()) => {
+	if (!timestamp) return 'Time unavailable';
+	const minutes = Math.max(0, Math.floor((now - new Date(timestamp).getTime()) / 60000));
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes}m`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ${minutes % 60}m`;
+	return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+};
+
 function AreaPicker({ areas, selectedArea, onSelect }) {
 	const [open, setOpen] = React.useState(false);
 	const [browseParent, setBrowseParent] = React.useState(null);
@@ -70,6 +80,47 @@ function AuthDialog({ areas, onAuthenticated, onClose }) {
 	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog auth-dialog" onSubmit={submit}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Cloud2Tech account</p><h2>{mode === 'login' ? 'Welcome back.' : 'Save your service area.'}</h2><div className="auth-tabs"><button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Sign in</button><button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Create account</button></div>{mode === 'signup' && <><label>Your name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Thabo Mokoena" /></label><label>Mobile number <span>optional</span><input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+27 82 000 0000" /></label></>}<label>Email address<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="you@example.com" /></label><label>Password <span>{mode === 'signup' ? '8 characters minimum' : ''}</span><input required type="password" minLength={mode === 'signup' ? 8 : undefined} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="••••••••" /></label>{mode === 'signup' && <label>Preferred area<select value={form.preferredArea} onChange={(event) => setForm({ ...form, preferredArea: event.target.value })}>{areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label>}{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">{mode === 'login' ? 'Sign in' : 'Create account'} <span>→</span></button></form></div>;
 }
 
+function NotificationDialog({ recipientCount, onClose, onSent }) {
+	const [subject, setSubject] = React.useState('Service delivery update');
+	const [message, setMessage] = React.useState('There is an update on a service issue in your area. Please open Cloud2Tech to view the latest status.');
+	const [sending, setSending] = React.useState(false);
+	const [error, setError] = React.useState('');
+
+	const send = async (event) => {
+		event.preventDefault();
+		setSending(true);
+		const response = await fetch(`${api}/municipality/notifications/broadcast`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject, message }) });
+		const payload = await response.json();
+		setSending(false);
+		if (!response.ok) { setError(payload.error ?? 'Could not queue notification.'); return; }
+		onSent(payload.data);
+	};
+
+	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog notification-dialog" onSubmit={send}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Resident notification</p><h2>Send an update.</h2><p className="dialog-note">This will queue an email for all {recipientCount} registered people.</p><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} /></label><label>Message<textarea required rows="5" value={message} onChange={(event) => setMessage(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={sending} type="submit">{sending ? 'Queuing…' : 'Queue email'} <span>→</span></button></form></div>;
+}
+
+function MunicipalityConsole({ onClose }) {
+	const [research, setResearch] = React.useState(null);
+	const [showNotification, setShowNotification] = React.useState(false);
+	const [notice, setNotice] = React.useState('');
+	const [now, setNow] = React.useState(Date.now());
+
+	const loadResearch = () => fetch(`${api}/municipality/research`).then((response) => response.json()).then((payload) => setResearch(payload.data));
+	React.useEffect(() => { loadResearch(); const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
+
+	const exportResearch = () => {
+		const blob = new Blob([JSON.stringify(research, null, 2)], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `cloud2tech-research-${new Date().toISOString().slice(0, 10)}.json`;
+		link.click();
+		URL.revokeObjectURL(url);
+	};
+
+	return <section className="municipality-console"><header className="console-header"><div><p className="eyebrow">Municipality workspace</p><h2>Research & outreach</h2><p>Service delivery data for planning, accountability, and resident communication.</p></div><div className="console-actions"><button className="console-button" onClick={exportResearch} disabled={!research}>↓ Export JSON</button><button className="console-button primary" onClick={() => setShowNotification(true)} disabled={!research}>✉ Notify residents</button><button className="console-close" onClick={onClose}>Close ×</button></div></header>{notice && <div className="success-banner">{notice}</div>}{research && <><div className="research-metrics"><div><strong>{research.totalReports}</strong><span>Total reports</span></div><div><strong>{research.openReports}</strong><span>Currently open</span></div><div><strong>{research.resolvedReports}</strong><span>Resolved</span></div><div><strong>{research.registeredUsers}</strong><span>Registered people</span></div></div><div className="research-grid"><div className="research-card"><div className="card-heading"><h3>Reports by area</h3><span>All time</span></div>{research.byArea.map((area) => <div className="bar-row" key={area.name}><div><strong>{area.name}</strong><small>{area.level} · {area.open} open</small></div><span className="bar-track"><i style={{ width: `${Math.max(8, area.reports / research.totalReports * 100)}%` }} /></span><b>{area.reports}</b></div>)}</div><div className="research-card"><div className="card-heading"><h3>Issue patterns</h3><span>All time</span></div>{research.byCategory.map((item) => <div className="category-row" key={item.category}><span className={`category ${item.category.toLowerCase().replace(' ', '-')}`} /><strong>{item.category}</strong><small>{item.resolved} resolved</small><b>{item.count}</b></div>)}</div></div><div className="research-card report-table-card"><div className="card-heading"><h3>Research report register</h3><span>Live · updated {new Date(research.generatedAt).toLocaleTimeString()}</span></div><div className="report-table"><div className="table-row table-head"><span>Report</span><span>Area</span><span>Status</span><span>Open for</span></div>{research.reports.map((report) => <div className="table-row" key={report.id}><span><strong>{report.id}</strong><small>{report.category} · {report.street}</small></span><span>{report.areaName}</span><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><span className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : formatElapsed(report.loggedAt, now)}</span></div>)}</div></div></>}{showNotification && <NotificationDialog recipientCount={research?.registeredUsers ?? 0} onClose={() => setShowNotification(false)} onSent={(broadcast) => { setNotice(`Email queued for ${broadcast.recipientCount} registered people.`); setShowNotification(false); loadResearch(); }} />}</section>;
+}
+
 function MapView({ area, points }) {
 	const mapRef = React.useRef(null);
 
@@ -92,7 +143,9 @@ function App() {
 	const [heatmap, setHeatmap] = React.useState([]);
 	const [showForm, setShowForm] = React.useState(false);
 	const [showAuth, setShowAuth] = React.useState(false);
+	const [showMunicipality, setShowMunicipality] = React.useState(false);
 	const [user, setUser] = React.useState(null);
+	const [now, setNow] = React.useState(Date.now());
 	const [photos, setPhotos] = React.useState([]);
 	const [photoPreviews, setPhotoPreviews] = React.useState([]);
 	const [error, setError] = React.useState('');
@@ -112,6 +165,7 @@ function App() {
 		if (token) fetch(`${api}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : Promise.reject()).then((payload) => { setUser(payload.data); setSelectedArea(payload.data.preferredArea ?? 'all'); }).catch(() => localStorage.removeItem('cloud2tech_token'));
 	}, []);
 	React.useEffect(() => { refresh(); }, [selectedArea]);
+	React.useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
 
 	const selectArea = async (areaId) => {
 		setSelectedArea(areaId);
@@ -169,10 +223,11 @@ function App() {
 	const selectedAreaDetails = areas.find((area) => area.id === selectedArea) ?? { name: 'All service areas', subtitle: 'Municipal overview', latitude: -34, longitude: 18.65, zoom: 11 };
 
 	return <main className="shell">
-		<nav><span className="logo">CLOUD2TECH</span><AreaPicker areas={areas} selectedArea={selectedArea} onSelect={selectArea} /><div className="nav-actions">{user ? <div className="account-menu"><button className="account-button" type="button" onClick={logout}><span className="avatar">{user.name.slice(0, 1).toUpperCase()}</span><span>{user.name.split(' ')[0]}</span><small>Sign out</small></button></div> : <button className="login-button" type="button" onClick={() => setShowAuth(true)}>Sign in</button>}<button className="report" onClick={() => setShowForm(true)}>+ Report an issue</button></div></nav>
+		<nav><span className="logo">CLOUD2TECH</span><AreaPicker areas={areas} selectedArea={selectedArea} onSelect={selectArea} /><div className="nav-actions"><button className="console-link" type="button" onClick={() => setShowMunicipality(!showMunicipality)}>▦ Municipality</button>{user ? <div className="account-menu"><button className="account-button" type="button" onClick={logout}><span className="avatar">{user.name.slice(0, 1).toUpperCase()}</span><span>{user.name.split(' ')[0]}</span><small>Sign out</small></button></div> : <button className="login-button" type="button" onClick={() => setShowAuth(true)}>Sign in</button>}<button className="report" onClick={() => setShowForm(true)}>+ Report an issue</button></div></nav>
+		{showMunicipality && <MunicipalityConsole onClose={() => setShowMunicipality(false)} />}
 		<section className="intro"><div><p className="eyebrow">{selectedAreaDetails.subtitle}</p><h1>{selectedAreaDetails.name === 'All service areas' ? <>Make the work<br /><span>visible.</span></> : <>{selectedAreaDetails.name}<br /><span>in view.</span></>}</h1><p className="lede">A shared operating picture for residents and the teams responsible for keeping {selectedAreaDetails.name.toLowerCase()} moving.</p></div><div className="live"><span className="pulse" /> Live operations desk <small>Updated just now</small></div></section>
 		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div></section>
-		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><button className="advance" onClick={() => advanceReport(report)} title="Move report forward">→</button></article>)}</div></section>
+		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p><small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><button className="advance" onClick={() => advanceReport(report)} title="Move report forward">→</button></article>)}</div></section>
 		<footer>Cloud2Tech Civic Systems <span>Transparency by default</span></footer>
 		{showAuth && <AuthDialog areas={areas} onAuthenticated={handleAuthenticated} onClose={() => setShowAuth(false)} />}
 		{showForm && <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && closeForm()}><form className="dialog" onSubmit={submitReport}><button type="button" className="close" onClick={closeForm}>×</button><p className="eyebrow">Citizen report</p><h2>What needs attention?</h2><label>Service area<select value={form.area} onChange={(event) => setForm({ ...form, area: event.target.value })}>{areas.filter((area) => area.id !== 'all').map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label><label>Issue type<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Water leak</option><option>Pothole</option><option>Power outage</option><option>Street light</option></select></label><label>Street name<input required value={form.street} onChange={(event) => setForm({ ...form, street: event.target.value })} placeholder="e.g. Mew Way" /></label><label>Suburb or landmark<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="Optional location detail" /></label><label className="photo-picker">Photos <span>up to 3 · 5MB each</span><input type="file" accept="image/*" multiple onChange={handlePhotos} /><div className="photo-previews">{photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Selected upload ${index + 1}`} />)}</div></label>{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">Submit report <span>→</span></button></form></div>}

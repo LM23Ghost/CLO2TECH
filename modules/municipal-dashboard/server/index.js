@@ -19,19 +19,20 @@ const upload = multer({
 });
 
 const reports = [
-	{ id: 'RPT-1042', area: 'mfuleni', street: 'Mfuleni North', category: 'Water leak', location: 'Mfuleni North', latitude: -33.997, longitude: 18.684, status: 'in_progress', priority: 'high', createdAt: 'Today, 08:42', photos: [] },
-	{ id: 'RPT-1041', area: 'bellville-south', street: 'Voortrekker Road', category: 'Pothole', location: 'Bellville South', latitude: -33.912, longitude: 18.631, status: 'received', priority: 'normal', createdAt: 'Today, 08:16', photos: [] },
-	{ id: 'RPT-1038', area: 'khayelitsha', street: 'Mew Way', category: 'Power outage', location: 'Ward 7', latitude: -34.041, longitude: 18.674, status: 'resolved', resolvedHours: 12.5, priority: 'high', createdAt: 'Yesterday, 16:30', photos: [] },
-	{ id: 'RPT-1037', area: 'khayelitsha', street: 'Walter Sisulu Drive', category: 'Street light', location: 'Site B', latitude: -34.035, longitude: 18.667, status: 'in_progress', priority: 'normal', createdAt: 'Yesterday, 14:12', photos: [] },
-	{ id: 'RPT-1036', area: 'delft', street: 'The Hague Avenue', category: 'Water leak', location: 'The Hague', latitude: -33.981, longitude: 18.644, status: 'received', priority: 'high', createdAt: 'Yesterday, 13:25', photos: [] },
-	{ id: 'RPT-1035', area: 'mitchells-plain', street: 'AZ Berman Drive', category: 'Pothole', location: 'Mitchells Plain', latitude: -34.052, longitude: 18.605, status: 'resolved', resolvedHours: 24, priority: 'normal', createdAt: 'Yesterday, 11:10', photos: [] },
-	{ id: 'RPT-1034', area: 'sandton', street: 'Rivonia Road', category: 'Pothole', location: 'Sandton', latitude: -26.107, longitude: 28.056, status: 'in_progress', priority: 'normal', createdAt: 'Today, 07:52', photos: [] },
-	{ id: 'RPT-1033', area: 'parkhurst', street: 'Sixth Street', category: 'Street light', location: 'Parkhurst', latitude: -26.124, longitude: 28.013, status: 'received', priority: 'normal', createdAt: 'Yesterday, 17:45', photos: [] },
-	{ id: 'RPT-1032', area: 'sandton', street: 'Grayston Drive', category: 'Water leak', location: 'Sandton Central', latitude: -26.107, longitude: 28.062, status: 'resolved', resolvedHours: 8, priority: 'high', createdAt: 'Yesterday, 12:20', photos: [] },
+	{ id: 'RPT-1042', area: 'mfuleni', street: 'Mfuleni North', category: 'Water leak', location: 'Mfuleni North', latitude: -33.997, longitude: 18.684, status: 'in_progress', priority: 'high', loggedAt: new Date(Date.now() - 2.4 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1041', area: 'bellville-south', street: 'Voortrekker Road', category: 'Pothole', location: 'Bellville South', latitude: -33.912, longitude: 18.631, status: 'received', priority: 'normal', loggedAt: new Date(Date.now() - 4.1 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1038', area: 'khayelitsha', street: 'Mew Way', category: 'Power outage', location: 'Ward 7', latitude: -34.041, longitude: 18.674, status: 'resolved', resolvedHours: 12.5, priority: 'high', loggedAt: new Date(Date.now() - 29 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1037', area: 'khayelitsha', street: 'Walter Sisulu Drive', category: 'Street light', location: 'Site B', latitude: -34.035, longitude: 18.667, status: 'in_progress', priority: 'normal', loggedAt: new Date(Date.now() - 20 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1036', area: 'delft', street: 'The Hague Avenue', category: 'Water leak', location: 'The Hague', latitude: -33.981, longitude: 18.644, status: 'received', priority: 'high', loggedAt: new Date(Date.now() - 23 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1035', area: 'mitchells-plain', street: 'AZ Berman Drive', category: 'Pothole', location: 'Mitchells Plain', latitude: -34.052, longitude: 18.605, status: 'resolved', resolvedHours: 24, priority: 'normal', loggedAt: new Date(Date.now() - 51 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1034', area: 'sandton', street: 'Rivonia Road', category: 'Pothole', location: 'Sandton', latitude: -26.107, longitude: 28.056, status: 'in_progress', priority: 'normal', loggedAt: new Date(Date.now() - 7.2 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1033', area: 'parkhurst', street: 'Sixth Street', category: 'Street light', location: 'Parkhurst', latitude: -26.124, longitude: 28.013, status: 'received', priority: 'normal', loggedAt: new Date(Date.now() - 15 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1032', area: 'sandton', street: 'Grayston Drive', category: 'Water leak', location: 'Sandton Central', latitude: -26.107, longitude: 28.062, status: 'resolved', resolvedHours: 8, priority: 'high', loggedAt: new Date(Date.now() - 33 * 3600000).toISOString(), photos: [] },
 ];
 
 const users = [];
 const sessions = new Map();
+const notificationBroadcasts = [];
 
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({ salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') });
 const publicUser = (user) => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, preferredArea: user.preferredArea });
@@ -89,7 +90,7 @@ app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
 app.get('/api/v1/citizen/reports', (req, res) => res.json({ data: reportsForArea(req.query.area) }));
 app.post('/api/v1/citizen/reports', upload.array('photos', 3), (req, res) => {
 	const area = areas.find((item) => item.id === req.body.area) ?? areas[1];
-	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: area.latitude, longitude: area.longitude, status: 'received', resolvedHours: null, priority: 'normal', createdAt: 'Just now', photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
+	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: area.latitude, longitude: area.longitude, status: 'received', resolvedHours: null, priority: 'normal', loggedAt: new Date().toISOString(), photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
 	reports.unshift(report);
 	res.status(201).json({ data: report });
 });
@@ -107,6 +108,17 @@ app.get('/api/v1/dashboard/summary', (req, res) => {
 	res.json({ data: { open: scopedReports.filter((item) => item.status !== 'resolved').length, inProgress: scopedReports.filter((item) => item.status === 'in_progress').length, resolved: scopedReports.filter((item) => item.status === 'resolved').length, averageResolutionHours } });
 });
 app.get('/api/v1/dashboard/heatmap', (req, res) => res.json({ data: reportsForArea(req.query.area).filter((item) => item.status !== 'resolved').map((item) => ({ id: item.id, latitude: item.latitude, longitude: item.longitude, category: item.category, street: item.street })) }));
+app.get('/api/v1/municipality/research', (_req, res) => {
+	const byArea = areas.filter((area) => area.level === 'province' || area.level === 'municipality').map((area) => ({ name: area.name, level: area.level, reports: reportsForArea(area.id).length, open: reportsForArea(area.id).filter((report) => report.status !== 'resolved').length }));
+	const byCategory = [...new Set(reports.map((report) => report.category))].map((category) => ({ category, count: reports.filter((report) => report.category === category).length, resolved: reports.filter((report) => report.category === category && report.status === 'resolved').length }));
+	res.json({ data: { generatedAt: new Date().toISOString(), totalReports: reports.length, openReports: reports.filter((report) => report.status !== 'resolved').length, resolvedReports: reports.filter((report) => report.status === 'resolved').length, registeredUsers: users.length, notificationBroadcasts: notificationBroadcasts.length, byArea, byCategory, reports: reports.map((report) => ({ ...report, areaName: areas.find((area) => area.id === report.area)?.name ?? report.area })) } });
+});
+app.post('/api/v1/municipality/notifications/broadcast', (req, res) => {
+	if (!req.body.subject || !req.body.message) return res.status(400).json({ error: 'Subject and message are required.' });
+	const broadcast = { id: `broadcast_${Date.now()}`, subject: req.body.subject, message: req.body.message, recipientCount: users.length, status: 'queued', createdAt: new Date().toISOString() };
+	notificationBroadcasts.unshift(broadcast);
+	res.status(202).json({ data: broadcast });
+});
 app.post('/api/v1/workflow/route', (req, res) => res.status(202).json({ data: { reportId: req.body.reportId ?? null, department: req.body.department ?? 'Operations', status: 'queued' } }));
 app.get('/api/v1/reporting/transparency', (req, res) => { const scopedReports = reportsForArea(req.query.area); res.json({ data: { reportingPeriod: 'current', totalReports: scopedReports.length, resolutionRate: scopedReports.length ? Math.round((scopedReports.filter((item) => item.status === 'resolved').length / scopedReports.length) * 100) : 0 } }); });
 app.use('/uploads', express.static(uploadDirectory));
