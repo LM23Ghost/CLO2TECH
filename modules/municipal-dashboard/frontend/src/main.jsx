@@ -168,6 +168,34 @@ function MunicipalityUpdatePanel({ token, onClose }) {
 	return <section className="municipality-console update-panel"><header className="console-header"><div><p className="eyebrow">Municipality workspace</p><h2>Keep residents updated</h2><p>Publish outage causes, status changes, and public explanations for reports in your assigned area.</p></div><button className="console-close" onClick={onClose}>Close ×</button></header><div className="update-layout"><div className="update-report-list"><p className="eyebrow">Scoped reports</p>{reports.map((report) => <button className={`update-report-option ${report.id === selectedId ? 'is-selected' : ''}`} key={report.id} onClick={() => choose(report)}><strong>{report.id}</strong><span>{report.category} · {report.street}</span><small>{report.status.replace('_', ' ')}</small></button>)}</div>{selected && <form className="research-card update-form" onSubmit={publish}><p className="eyebrow">Public update</p><h3>{selected.category} · {selected.street}</h3><label>Status<select value={status || selected.status} onChange={(event) => setStatus(event.target.value)}><option value="received">Received</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option></select></label><label>Reason / cause<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Planned maintenance" /></label><label>Message<textarea required rows="5" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="What should residents know?" /></label>{notice && <p className="success-banner">{notice}</p>}<button className="submit" type="submit">Publish update <span>→</span></button></form>}</div></section>;
 }
 
+function AddressAutocomplete({ value, onChange, onPlace }) {
+	const inputRef = React.useRef(null);
+	const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+	React.useEffect(() => {
+		if (!apiKey || window.google?.maps?.places) return;
+		const script = document.createElement('script');
+		script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+		script.async = true;
+		script.onload = () => inputRef.current?.dispatchEvent(new Event('google-ready'));
+		document.head.appendChild(script);
+		return () => { if (document.head.contains(script)) document.head.removeChild(script); };
+	}, [apiKey]);
+
+	React.useEffect(() => {
+		if (!apiKey || !window.google?.maps?.places || !inputRef.current || inputRef.current.dataset.autocomplete) return;
+		const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, { componentRestrictions: { country: 'za' }, fields: ['formatted_address', 'geometry', 'name'] });
+		autocomplete.addListener('place_changed', () => {
+			const place = autocomplete.getPlace();
+			if (place.formatted_address) onChange(place.formatted_address);
+			if (place.geometry?.location) onPlace({ latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() });
+		});
+		inputRef.current.dataset.autocomplete = 'true';
+	}, [apiKey, onChange, onPlace]);
+
+	return <><input ref={inputRef} required value={value} onChange={(event) => onChange(event.target.value)} placeholder={apiKey ? 'Search and select a street address' : 'Street name or address'} />{apiKey ? <small className="field-hint">Select a result to pin the exact address.</small> : <small className="field-hint">Add VITE_GOOGLE_MAPS_API_KEY to enable address search.</small>}</>;
+}
+
 function MapView({ area, points }) {
 	const mapRef = React.useRef(null);
 
@@ -176,6 +204,7 @@ function MapView({ area, points }) {
 		L.control.zoom({ position: 'bottomright' }).addTo(map);
 		L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 		points.forEach((point) => L.circleMarker([point.latitude, point.longitude], { radius: 8, color: '#1a1d1c', weight: 2, fillColor: '#c4e36d', fillOpacity: .95 }).bindPopup(`<strong>${point.category}</strong><br>${point.street}`).addTo(map));
+		if (area.id === 'all' && points.length > 1) map.fitBounds(L.latLngBounds(points.map((point) => [point.latitude, point.longitude])), { padding: [24, 24], maxZoom: 11 });
 		return () => map.remove();
 	}, [area, points]);
 
@@ -199,7 +228,7 @@ function App() {
 	const [photos, setPhotos] = React.useState([]);
 	const [photoPreviews, setPhotoPreviews] = React.useState([]);
 	const [error, setError] = React.useState('');
-	const [form, setForm] = React.useState({ area: 'Khayelitsha', category: 'Water leak', street: '', location: '' });
+	const [form, setForm] = React.useState({ area: 'Khayelitsha', category: 'Water leak', street: '', location: '', latitude: '', longitude: '' });
 
 	const refresh = async () => {
 		const query = selectedArea === 'all' ? '' : `?area=${encodeURIComponent(selectedArea)}`;
@@ -263,14 +292,8 @@ function App() {
 		const response = await fetch(`${api}/citizen/reports`, { method: 'POST', body: payload });
 		if (!response.ok) { setError((await response.json()).error ?? 'Could not submit the report.'); return; }
 		setSelectedArea(form.area);
-		setForm({ ...form, street: '', location: '' });
+		setForm({ ...form, street: '', location: '', latitude: '', longitude: '' });
 		closeForm();
-		refresh();
-	};
-
-	const advanceReport = async (report) => {
-		const status = report.status === 'received' ? 'in_progress' : 'resolved';
-		await fetch(`${api}/citizen/reports/${report.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
 		refresh();
 	};
 
@@ -282,11 +305,11 @@ function App() {
 		{showMunicipalityUpdates && <MunicipalityUpdatePanel token={municipalityToken} onClose={() => setShowMunicipalityUpdates(false)} />}
 		<section className="intro"><div><p className="eyebrow">{selectedAreaDetails.subtitle}</p><h1>{selectedAreaDetails.name === 'All service areas' ? <>Make the work<br /><span>visible.</span></> : <>{selectedAreaDetails.name}<br /><span>in view.</span></>}</h1><p className="lede">A shared operating picture for residents and the teams responsible for keeping {selectedAreaDetails.name.toLowerCase()} moving.</p></div><div className="live"><span className="pulse" /> Live operations desk <small>Updated just now</small></div></section>
 		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div></section>
-		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p>{report.reason && <small className="report-reason">Reason: {report.reason}</small>}{report.updates?.[0] && <small className="report-update">Update: {report.updates[0].message}</small>}<small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><button className="advance" onClick={() => advanceReport(report)} title="Move report forward">→</button></article>)}</div></section>
+		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p>{report.reason && <small className="report-reason">Reason: {report.reason}</small>}{report.updates?.[0] && <small className="report-update">Update: {report.updates[0].message}</small>}<small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span></article>)}</div></section>
 		<footer>Cloud2Tech Civic Systems <span>Transparency by default</span></footer>
 		{showAuth && <AuthDialog areas={areas} onAuthenticated={handleAuthenticated} onClose={() => setShowAuth(false)} />}
 		{showMunicipalityAuth && <MunicipalityLogin onAuthenticated={handleMunicipalityAuthenticated} onClose={() => setShowMunicipalityAuth(false)} />}
-		{showForm && <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && closeForm()}><form className="dialog" onSubmit={submitReport}><button type="button" className="close" onClick={closeForm}>×</button><p className="eyebrow">Citizen report</p><h2>What needs attention?</h2><label>Service area<select value={form.area} onChange={(event) => setForm({ ...form, area: event.target.value })}>{areas.filter((area) => area.id !== 'all').map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label><label>Issue type<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Water leak</option><option>Pothole</option><option>Electricity outage</option><option>Street light</option></select></label><label>Street name<input required value={form.street} onChange={(event) => setForm({ ...form, street: event.target.value })} placeholder="e.g. Mew Way" /></label><label>Suburb or landmark<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="Optional location detail" /></label><label className="photo-picker">Photos <span>up to 3 · 5MB each</span><input type="file" accept="image/*" multiple onChange={handlePhotos} /><div className="photo-previews">{photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Selected upload ${index + 1}`} />)}</div></label>{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">Submit report <span>→</span></button></form></div>}
+		{showForm && <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && closeForm()}><form className="dialog" onSubmit={submitReport}><button type="button" className="close" onClick={closeForm}>×</button><p className="eyebrow">Citizen report</p><h2>What needs attention?</h2><label>Service area<select value={form.area} onChange={(event) => setForm({ ...form, area: event.target.value })}>{areas.filter((area) => area.id !== 'all').map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label><label>Issue type<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Water leak</option><option>Pothole</option><option>Electricity outage</option><option>Street light</option></select></label><label>Street address<AddressAutocomplete value={form.street} onChange={(street) => setForm({ ...form, street })} onPlace={({ latitude, longitude }) => setForm({ ...form, latitude, longitude })} /></label><label>Suburb or landmark<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="Optional location detail" /></label><label className="photo-picker">Photos <span>up to 3 · 5MB each</span><input type="file" accept="image/*" multiple onChange={handlePhotos} /><div className="photo-previews">{photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Selected upload ${index + 1}`} />)}</div></label>{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">Submit report <span>→</span></button></form></div>}
 	</main>;
 }
 

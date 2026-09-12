@@ -103,13 +103,13 @@ app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
 app.get('/api/v1/citizen/reports', (req, res) => res.json({ data: reportsForArea(req.query.area) }));
 app.post('/api/v1/citizen/reports', upload.array('photos', 3), (req, res) => {
 	const area = areas.find((item) => item.id === req.body.area) ?? areas[1];
-	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: area.latitude, longitude: area.longitude, status: 'received', resolvedHours: null, reason: '', priority: 'normal', loggedAt: new Date().toISOString(), updates: [], photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
+	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: Number(req.body.latitude) || area.latitude, longitude: Number(req.body.longitude) || area.longitude, status: 'received', resolvedHours: null, reason: '', priority: 'normal', loggedAt: new Date().toISOString(), updates: [], photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
 	reports.unshift(report);
 	res.status(201).json({ data: report });
 });
-app.patch('/api/v1/citizen/reports/:id/status', (req, res) => {
+app.patch('/api/v1/citizen/reports/:id/status', requireMunicipality, (req, res) => {
 	const report = reports.find((item) => item.id === req.params.id);
-	if (!report) return res.status(404).json({ error: 'Report not found' });
+	if (!report || !reportsForArea(req.municipality.areaId).includes(report)) return res.status(404).json({ error: 'Report not found in your jurisdiction.' });
 	report.status = req.body.status ?? report.status;
 	if (typeof req.body.reason === 'string') report.reason = req.body.reason.trim();
 	if (report.status === 'resolved' && !report.resolvedHours) report.resolvedHours = Number(req.body.resolvedHours) || 18.4;
