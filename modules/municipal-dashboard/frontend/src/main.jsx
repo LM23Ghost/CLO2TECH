@@ -6,6 +6,36 @@ import './styles.css';
 
 const api = 'http://localhost:4003/api/v1';
 
+function AreaPicker({ areas, selectedArea, onSelect }) {
+	const [open, setOpen] = React.useState(false);
+	const pickerRef = React.useRef(null);
+	const selected = areas.find((area) => area.id === selectedArea) ?? areas[0];
+
+	React.useEffect(() => {
+		const closeOnOutsideClick = (event) => {
+			if (pickerRef.current && !pickerRef.current.contains(event.target)) setOpen(false);
+		};
+		document.addEventListener('mousedown', closeOnOutsideClick);
+		return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+	}, []);
+
+	const choose = (areaId) => {
+		onSelect(areaId);
+		setOpen(false);
+	};
+
+	return <div className="area-picker" ref={pickerRef}>
+		<span className="area-label">Viewing</span>
+		<button className={`area-trigger ${open ? 'is-open' : ''}`} type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen(!open)}>
+			<span><strong>{selected?.name ?? 'Choose an area'}</strong><small>{selected?.subtitle ?? 'Service area'}</small></span><span className="chevron">⌄</span>
+		</button>
+		{open && <div className="area-menu" role="listbox" aria-label="Service areas">
+			<div className="area-menu-head"><span>Service area</span><small>{areas.length - 1} locations</small></div>
+			{areas.map((area) => <button key={area.id} className={`area-option level-${area.level} ${area.id === selectedArea ? 'is-selected' : ''}`} type="button" role="option" aria-selected={area.id === selectedArea} onClick={() => choose(area.id)}><span className="area-dot" /> <span className="area-option-copy"><strong>{area.name}</strong><small>{area.subtitle}</small></span>{area.id === selectedArea && <span className="check">✓</span>}</button>)}
+		</div>}
+	</div>;
+}
+
 function MapView({ area, points }) {
 	const mapRef = React.useRef(null);
 
@@ -81,7 +111,7 @@ function App() {
 	const selectedAreaDetails = areas.find((area) => area.id === selectedArea) ?? { name: 'All service areas', subtitle: 'Municipal overview', latitude: -34, longitude: 18.65, zoom: 11 };
 
 	return <main className="shell">
-		<nav><span className="logo">CLOUD2TECH</span><label className="area-picker"><span>Viewing</span><select aria-label="Select service area" value={selectedArea} onChange={(event) => setSelectedArea(event.target.value)}>{areas.map((area) => <option key={area.id} value={area.id}>{area.level === 'province' ? `▾ ${area.name}` : area.level === 'municipality' ? `  ↳ ${area.name}` : area.level === 'neighbourhood' ? `    · ${area.name}` : area.name}</option>)}</select></label><button className="report" onClick={() => setShowForm(true)}>+ Report an issue</button></nav>
+		<nav><span className="logo">CLOUD2TECH</span><AreaPicker areas={areas} selectedArea={selectedArea} onSelect={setSelectedArea} /><button className="report" onClick={() => setShowForm(true)}>+ Report an issue</button></nav>
 		<section className="intro"><div><p className="eyebrow">{selectedAreaDetails.subtitle}</p><h1>{selectedAreaDetails.name === 'All service areas' ? <>Make the work<br /><span>visible.</span></> : <>{selectedAreaDetails.name}<br /><span>in view.</span></>}</h1><p className="lede">A shared operating picture for residents and the teams responsible for keeping {selectedAreaDetails.name.toLowerCase()} moving.</p></div><div className="live"><span className="pulse" /> Live operations desk <small>Updated just now</small></div></section>
 		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div></section>
 		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><button className="advance" onClick={() => advanceReport(report)} title="Move report forward">→</button></article>)}</div></section>
