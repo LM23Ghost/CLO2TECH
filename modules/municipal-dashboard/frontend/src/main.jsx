@@ -38,7 +38,7 @@ function AreaPicker({ areas, selectedArea, onSelect }) {
 
 	const choose = (areaId) => {
 		const area = areas.find((item) => item.id === areaId);
-		if (area && hasChildren(area) && !search.trim()) {
+		if (area && area.id !== 'all' && hasChildren(area) && !search.trim()) {
 			setBrowseParent(area.id);
 			return;
 		}
