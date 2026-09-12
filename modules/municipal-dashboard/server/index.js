@@ -1,4 +1,5 @@
 import cors from 'cors';
+import crypto from 'node:crypto';
 import express from 'express';
 import fs from 'node:fs';
 import multer from 'multer';
@@ -29,6 +30,14 @@ const reports = [
 	{ id: 'RPT-1032', area: 'sandton', street: 'Grayston Drive', category: 'Water leak', location: 'Sandton Central', latitude: -26.107, longitude: 28.062, status: 'resolved', resolvedHours: 8, priority: 'high', createdAt: 'Yesterday, 12:20', photos: [] },
 ];
 
+const users = [];
+const sessions = new Map();
+
+const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({ salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') });
+const publicUser = (user) => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, preferredArea: user.preferredArea });
+const getUser = (req) => sessions.get(req.headers.authorization?.replace('Bearer ', ''));
+const requireUser = (req, res, next) => { const user = getUser(req); if (!user) return res.status(401).json({ error: 'Please sign in to continue.' }); req.user = user; next(); };
+
 const areas = [
 	{ id: 'all', name: 'All service areas', level: 'overview', parentId: null, subtitle: 'Municipal overview', latitude: -29.5, longitude: 24.5, zoom: 5 },
 	{ id: 'western-cape', name: 'Western Cape', level: 'province', parentId: 'all', subtitle: 'Province overview', latitude: -33.9, longitude: 18.6, zoom: 9 },
@@ -51,6 +60,32 @@ const reportsForArea = (area) => area && area !== 'all' ? reports.filter((report
 
 app.get('/api/v1/health', (_req, res) => res.json({ service: 'municipal-dashboard', status: 'ok' }));
 app.get('/api/v1/areas', (_req, res) => res.json({ data: areas }));
+app.post('/api/v1/auth/signup', (req, res) => {
+	const { name, email, password, phone, preferredArea = 'all' } = req.body;
+	if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });
+	if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+	if (users.some((user) => user.email.toLowerCase() === email.toLowerCase())) return res.status(409).json({ error: 'An account with this email already exists.' });
+	const credentials = hashPassword(password);
+	const user = { id: `usr_${Date.now()}`, name, email: email.toLowerCase(), phone: phone ?? '', preferredArea: areas.some((area) => area.id === preferredArea) ? preferredArea : 'all', ...credentials };
+	users.push(user);
+	const token = crypto.randomUUID();
+	sessions.set(token, user);
+	res.status(201).json({ data: { token, user: publicUser(user) } });
+});
+app.post('/api/v1/auth/login', (req, res) => {
+	const user = users.find((item) => item.email === req.body.email?.toLowerCase());
+	if (!user || hashPassword(req.body.password ?? '', user.salt).hash !== user.hash) return res.status(401).json({ error: 'Email or password is incorrect.' });
+	const token = crypto.randomUUID();
+	sessions.set(token, user);
+	res.json({ data: { token, user: publicUser(user) } });
+});
+app.get('/api/v1/auth/me', requireUser, (req, res) => res.json({ data: publicUser(req.user) }));
+app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
+	if (req.body.preferredArea && areas.some((area) => area.id === req.body.preferredArea)) req.user.preferredArea = req.body.preferredArea;
+	if (typeof req.body.name === 'string' && req.body.name.trim()) req.user.name = req.body.name.trim();
+	if (typeof req.body.phone === 'string') req.user.phone = req.body.phone.trim();
+	res.json({ data: publicUser(req.user) });
+});
 app.get('/api/v1/citizen/reports', (req, res) => res.json({ data: reportsForArea(req.query.area) }));
 app.post('/api/v1/citizen/reports', upload.array('photos', 3), (req, res) => {
 	const area = areas.find((item) => item.id === req.body.area) ?? areas[1];
