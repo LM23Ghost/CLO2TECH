@@ -41,6 +41,7 @@ const getUser = (req) => sessions.get(req.headers.authorization?.replace('Bearer
 const requireUser = (req, res, next) => { const user = getUser(req); if (!user) return res.status(401).json({ error: 'Please sign in to continue.' }); req.user = user; next(); };
 const municipalityEmail = process.env.MUNICIPALITY_WORK_EMAIL || 'municipality@cloud2tech.local';
 const municipalityPassword = process.env.MUNICIPALITY_WORK_PASSWORD || 'demo-municipality';
+const configuredMunicipalityAreas = (process.env.MUNICIPALITY_WORK_AREAS || 'gauteng').split(',').map((area) => area.trim()).filter(Boolean);
 const requireMunicipality = (req, res, next) => { const session = municipalitySessions.get(req.headers.authorization?.replace('Bearer ', '')); if (!session) return res.status(401).json({ error: 'Municipality work-account access is required.' }); req.municipality = session; next(); };
 
 const areas = [
@@ -65,6 +66,7 @@ const reportsForArea = (area) => area && area !== 'all' ? reports.filter((report
 
 app.get('/api/v1/health', (_req, res) => res.json({ service: 'municipal-dashboard', status: 'ok' }));
 app.get('/api/v1/areas', (_req, res) => res.json({ data: areas }));
+app.get('/api/v1/municipality/auth/options', (_req, res) => res.json({ data: { areas: areas.filter((area) => configuredMunicipalityAreas.includes(area.id)) } }));
 app.post('/api/v1/auth/signup', (req, res) => {
 	const { name, email, password, phone, preferredArea = 'all' } = req.body;
 	if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });
@@ -86,9 +88,10 @@ app.post('/api/v1/auth/login', (req, res) => {
 });
 app.post('/api/v1/municipality/auth/login', (req, res) => {
 	if (req.body.email?.toLowerCase() !== municipalityEmail.toLowerCase() || req.body.password !== municipalityPassword) return res.status(401).json({ error: 'Municipality work email or password is incorrect.' });
+	if (!configuredMunicipalityAreas.includes(req.body.area)) return res.status(403).json({ error: 'That work account is not assigned to this service area.' });
 	const token = crypto.randomUUID();
-	municipalitySessions.set(token, { email: municipalityEmail, role: 'municipality' });
-	res.json({ data: { token, user: { email: municipalityEmail, role: 'municipality' } } });
+	municipalitySessions.set(token, { email: municipalityEmail, role: 'municipality', areaId: req.body.area });
+	res.json({ data: { token, user: { email: municipalityEmail, role: 'municipality', areaId: req.body.area } } });
 });
 app.get('/api/v1/auth/me', requireUser, (req, res) => res.json({ data: publicUser(req.user) }));
 app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
@@ -119,13 +122,18 @@ app.get('/api/v1/dashboard/summary', (req, res) => {
 });
 app.get('/api/v1/dashboard/heatmap', (req, res) => res.json({ data: reportsForArea(req.query.area).filter((item) => item.status !== 'resolved').map((item) => ({ id: item.id, latitude: item.latitude, longitude: item.longitude, category: item.category, street: item.street })) }));
 app.get('/api/v1/municipality/research', requireMunicipality, (_req, res) => {
-	const byArea = areas.filter((area) => area.level === 'province' || area.level === 'municipality').map((area) => ({ name: area.name, level: area.level, reports: reportsForArea(area.id).length, open: reportsForArea(area.id).filter((report) => report.status !== 'resolved').length }));
-	const byCategory = [...new Set(reports.map((report) => report.category))].map((category) => ({ category, count: reports.filter((report) => report.category === category).length, resolved: reports.filter((report) => report.category === category && report.status === 'resolved').length }));
-	res.json({ data: { generatedAt: new Date().toISOString(), totalReports: reports.length, openReports: reports.filter((report) => report.status !== 'resolved').length, resolvedReports: reports.filter((report) => report.status === 'resolved').length, registeredUsers: users.length, notificationBroadcasts: notificationBroadcasts.length, byArea, byCategory, reports: reports.map((report) => ({ ...report, areaName: areas.find((area) => area.id === report.area)?.name ?? report.area })) } });
+	const scopedReports = reportsForArea(_req.municipality.areaId);
+	const scopeAreaIds = [_req.municipality.areaId, ...childAreaIds(_req.municipality.areaId)];
+	const scopedUsers = users.filter((user) => scopeAreaIds.includes(user.preferredArea));
+	const byArea = areas.filter((area) => (area.level === 'province' || area.level === 'municipality') && reportsForArea(area.id).some((report) => scopedReports.includes(report))).map((area) => ({ name: area.name, level: area.level, reports: reportsForArea(area.id).filter((report) => scopedReports.includes(report)).length, open: reportsForArea(area.id).filter((report) => scopedReports.includes(report) && report.status !== 'resolved').length }));
+	const byCategory = [...new Set(scopedReports.map((report) => report.category))].map((category) => ({ category, count: scopedReports.filter((report) => report.category === category).length, resolved: scopedReports.filter((report) => report.category === category && report.status === 'resolved').length }));
+	res.json({ data: { generatedAt: new Date().toISOString(), scope: _req.municipality.areaId, totalReports: scopedReports.length, openReports: scopedReports.filter((report) => report.status !== 'resolved').length, resolvedReports: scopedReports.filter((report) => report.status === 'resolved').length, registeredUsers: scopedUsers.length, notificationBroadcasts: notificationBroadcasts.filter((broadcast) => broadcast.areaId === _req.municipality.areaId).length, byArea, byCategory, reports: scopedReports.map((report) => ({ ...report, areaName: areas.find((area) => area.id === report.area)?.name ?? report.area })) } });
 });
 app.post('/api/v1/municipality/notifications/broadcast', requireMunicipality, (req, res) => {
 	if (!req.body.subject || !req.body.message) return res.status(400).json({ error: 'Subject and message are required.' });
-	const broadcast = { id: `broadcast_${Date.now()}`, subject: req.body.subject, message: req.body.message, recipientCount: users.length, status: 'queued', createdAt: new Date().toISOString() };
+	const scopeAreaIds = [req.municipality.areaId, ...childAreaIds(req.municipality.areaId)];
+	const recipientCount = users.filter((user) => scopeAreaIds.includes(user.preferredArea)).length;
+	const broadcast = { id: `broadcast_${Date.now()}`, areaId: req.municipality.areaId, subject: req.body.subject, message: req.body.message, recipientCount, status: 'queued', createdAt: new Date().toISOString() };
 	notificationBroadcasts.unshift(broadcast);
 	res.status(202).json({ data: broadcast });
 });

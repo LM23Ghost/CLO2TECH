@@ -83,15 +83,18 @@ function AuthDialog({ areas, onAuthenticated, onClose }) {
 function MunicipalityLogin({ onAuthenticated, onClose }) {
 	const [email, setEmail] = React.useState('');
 	const [password, setPassword] = React.useState('');
+	const [areas, setAreas] = React.useState([]);
+	const [area, setArea] = React.useState('');
 	const [error, setError] = React.useState('');
+	React.useEffect(() => { fetch(`${api}/municipality/auth/options`).then((response) => response.json()).then((payload) => { setAreas(payload.data.areas); setArea(payload.data.areas[0]?.id ?? ''); }); }, []);
 	const submit = async (event) => {
 		event.preventDefault();
-		const response = await fetch(`${api}/municipality/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+		const response = await fetch(`${api}/municipality/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, area }) });
 		const payload = await response.json();
 		if (!response.ok) { setError(payload.error ?? 'Could not sign in.'); return; }
 		onAuthenticated(payload.data);
 	};
-	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog auth-dialog" onSubmit={submit}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Municipality work account</p><h2>Research access.</h2><p className="dialog-note">Use your municipality work email. This area is separate from resident accounts.</p><label>Work email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@municipality.gov.za" /></label><label>Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Work account password" /></label>{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">Open console <span>→</span></button></form></div>;
+	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog auth-dialog" onSubmit={submit}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Municipality work account</p><h2>Research access.</h2><p className="dialog-note">Choose your assigned jurisdiction. Your account can only see and contact residents in that area.</p><label>Work email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@municipality.gov.za" /></label><label>Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Work account password" /></label><label>Assigned area<select required value={area} onChange={(event) => setArea(event.target.value)}>{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={!area} type="submit">Open console <span>→</span></button></form></div>;
 }
 
 function NotificationDialog({ recipientCount, token, onClose, onSent }) {
@@ -110,7 +113,7 @@ function NotificationDialog({ recipientCount, token, onClose, onSent }) {
 		onSent(payload.data);
 	};
 
-	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog notification-dialog" onSubmit={send}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Resident notification</p><h2>Send an update.</h2><p className="dialog-note">This will queue an email for all {recipientCount} registered people.</p><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} /></label><label>Message<textarea required rows="5" value={message} onChange={(event) => setMessage(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={sending} type="submit">{sending ? 'Queuing…' : 'Queue email'} <span>→</span></button></form></div>;
+	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog notification-dialog" onSubmit={send}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Resident notification</p><h2>Send an update.</h2><p className="dialog-note">This will queue an email for {recipientCount} registered people in your assigned area.</p><label>Subject<input required value={subject} onChange={(event) => setSubject(event.target.value)} /></label><label>Message<textarea required rows="5" value={message} onChange={(event) => setMessage(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={sending} type="submit">{sending ? 'Queuing…' : 'Queue email'} <span>→</span></button></form></div>;
 }
 
 function MunicipalityConsole({ token, onClose, onSignOut }) {
