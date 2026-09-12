@@ -34,6 +34,9 @@ const users = [];
 const sessions = new Map();
 const municipalitySessions = new Map();
 const notificationBroadcasts = [];
+const communityMessages = [
+	{ id: 'msg_1', areaId: 'sandton', author: 'Municipality', role: 'official', message: 'Please share updates about the Rivonia Road electricity outage here.', createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
+];
 
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({ salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') });
 const publicUser = (user) => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, preferredArea: user.preferredArea });
@@ -62,6 +65,7 @@ const areas = [
 ];
 
 const childAreaIds = (areaId) => areas.filter((area) => area.parentId === areaId).flatMap((area) => [area.id, ...childAreaIds(area.id)]);
+const parentAreaIds = (areaId) => { const area = areas.find((item) => item.id === areaId); return area?.parentId ? [area.parentId, ...parentAreaIds(area.parentId)] : []; };
 const reportsForArea = (area) => area && area !== 'all' ? reports.filter((report) => [area, ...childAreaIds(area)].includes(report.area)) : reports;
 
 app.get('/api/v1/health', (_req, res) => res.json({ service: 'municipal-dashboard', status: 'ok' }));
@@ -101,6 +105,8 @@ app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
 	res.json({ data: publicUser(req.user) });
 });
 app.get('/api/v1/citizen/reports', (req, res) => res.json({ data: reportsForArea(req.query.area) }));
+app.get('/api/v1/community/messages', (req, res) => { const area = req.query.area ?? 'all'; const scope = area === 'all' ? [...reports.map((report) => report.area), 'all'] : [area, ...childAreaIds(area), ...parentAreaIds(area)]; res.json({ data: communityMessages.filter((message) => scope.includes(message.areaId) || message.areaId === 'all') }); });
+app.post('/api/v1/community/messages', (req, res) => { const area = req.body.area; if (!area || !areas.some((item) => item.id === area)) return res.status(400).json({ error: 'A valid service area is required.' }); if (!req.body.message?.trim()) return res.status(400).json({ error: 'A message is required.' }); const message = { id: `msg_${Date.now()}`, areaId: area, author: req.body.name?.trim() || 'Resident', role: 'resident', message: req.body.message.trim(), createdAt: new Date().toISOString() }; communityMessages.unshift(message); res.status(201).json({ data: message }); });
 app.get('/api/v1/citizen/reports/:id/community', (req, res) => { const report = reports.find((item) => item.id === req.params.id); if (!report) return res.status(404).json({ error: 'Report not found' }); res.json({ data: report.community ?? { confirmed: 0, unresolved: 0, comments: [] } }); });
 app.post('/api/v1/citizen/reports/:id/comments', (req, res) => { const report = reports.find((item) => item.id === req.params.id); if (!report) return res.status(404).json({ error: 'Report not found' }); if (!req.body.message?.trim()) return res.status(400).json({ error: 'A message is required.' }); report.community ??= { confirmed: 0, unresolved: 0, comments: [] }; const comment = { name: req.body.name?.trim() || 'Resident', message: req.body.message.trim(), createdAt: new Date().toISOString() }; report.community.comments.unshift(comment); res.status(201).json({ data: comment }); });
 app.post('/api/v1/citizen/reports/:id/verify', (req, res) => { const report = reports.find((item) => item.id === req.params.id); if (!report) return res.status(404).json({ error: 'Report not found' }); report.community ??= { confirmed: 0, unresolved: 0, comments: [] }; if (req.body.verdict === 'resolved') report.community.confirmed += 1; else if (req.body.verdict === 'still_not_resolved') { report.community.unresolved += 1; report.status = 'in_progress'; report.updates = [{ message: 'Residents have reported that this issue may still be unresolved.', createdAt: new Date().toISOString() }, ...(report.updates ?? [])]; } else return res.status(400).json({ error: 'Unsupported verification verdict.' }); res.json({ data: report.community }); });
@@ -153,6 +159,7 @@ app.post('/api/v1/municipality/notifications/broadcast', requireMunicipality, (r
 	const recipientCount = users.filter((user) => scopeAreaIds.includes(user.preferredArea)).length;
 	const broadcast = { id: `broadcast_${Date.now()}`, areaId: req.municipality.areaId, subject: req.body.subject, message: req.body.message, recipientCount, status: 'queued', createdAt: new Date().toISOString() };
 	notificationBroadcasts.unshift(broadcast);
+	communityMessages.unshift({ id: `msg_${Date.now()}_official`, areaId: req.municipality.areaId, author: 'Municipality', role: 'official', message: `${req.body.subject}: ${req.body.message}`, createdAt: broadcast.createdAt });
 	res.status(202).json({ data: broadcast });
 });
 app.post('/api/v1/workflow/route', (req, res) => res.status(202).json({ data: { reportId: req.body.reportId ?? null, department: req.body.department ?? 'Operations', status: 'queued' } }));

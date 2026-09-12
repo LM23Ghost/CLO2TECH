@@ -44,6 +44,8 @@
 | GET | `/api/v1/citizen/reports/:id/community` | Read community confirmations and observations |
 | POST | `/api/v1/citizen/reports/:id/comments` | Add a resident observation to a report |
 | POST | `/api/v1/citizen/reports/:id/verify` | Confirm resolution or flag an issue as still unresolved |
+| GET | `/api/v1/community/messages` | Read resident chat and official notices for an area |
+| POST | `/api/v1/community/messages` | Post a resident message to the selected area |
 | GET | `/api/v1/dashboard/summary` | Read SLA and status summary |
 | GET | `/api/v1/dashboard/heatmap` | Read map aggregation data |
 | POST | `/api/v1/workflow/route` | Route a report to a department |
@@ -58,3 +60,5 @@ Residents can submit and view reports but cannot change report status; status/re
 Community verification is intentionally advisory: a `still_not_resolved` vote reopens the report for municipal review, while observations and confirmation counts remain visible alongside the report. Browser location is also advisory; after the device is observed in another known area for 12 hours, the app asks whether to switch views and never changes the selected area silently.
 
 The municipality operations console provides server-generated community counts and consolidates open reports by area, category, and street. Its search and status filters operate on the scoped report set so large queues remain usable without endless scrolling.
+
+Area chat is scoped to the selected area. Official municipality notices posted at a province or municipality level are inherited by descendant areas, so a Gauteng notice can appear for Sandton residents without exposing unrelated jurisdictions.
