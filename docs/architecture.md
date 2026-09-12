@@ -41,6 +41,9 @@
 | GET | `/api/v1/health` | Service health check |
 | POST | `/api/v1/citizen/reports` | Submit a geotagged service report |
 | POST | `/api/v1/municipality/reports/:id/updates` | Publish a scoped report status, reason, and resident-facing update |
+| GET | `/api/v1/citizen/reports/:id/community` | Read community confirmations and observations |
+| POST | `/api/v1/citizen/reports/:id/comments` | Add a resident observation to a report |
+| POST | `/api/v1/citizen/reports/:id/verify` | Confirm resolution or flag an issue as still unresolved |
 | GET | `/api/v1/dashboard/summary` | Read SLA and status summary |
 | GET | `/api/v1/dashboard/heatmap` | Read map aggregation data |
 | POST | `/api/v1/workflow/route` | Route a report to a department |
@@ -51,3 +54,5 @@
 Municipal report records include `loggedAt` (ISO 8601 UTC), `reason`, and an `updates` history. Open reports expose elapsed time from `loggedAt`; resolved reports include `resolvedHours`. `Electricity outage` is a supported citizen report category. Municipality work accounts must select an assigned jurisdiction during login. `MUNICIPALITY_WORK_AREAS` controls those assignments in development, and the token carries the selected scope; research, updates, and broadcast queries are filtered server-side to that scope. Replace this gate with Microsoft Entra work-account groups or claims in production. Broadcasts currently enter an in-memory queue and return the recipient count for the assigned area. Connect the queue to Azure Communication Services, SendGrid, or another SMTP provider for production delivery.
 
 Residents can submit and view reports but cannot change report status; status/reason updates require a municipality-scoped token. Street entry uses Google Places Autocomplete when `VITE_GOOGLE_MAPS_API_KEY` is configured and falls back to a normal address field for local development. The All service areas map fits its viewport to all active report markers.
+
+Community verification is intentionally advisory: a `still_not_resolved` vote reopens the report for municipal review, while observations and confirmation counts remain visible alongside the report. Browser location is also advisory; after the device is observed in another known area for 12 hours, the app asks whether to switch views and never changes the selected area silently.

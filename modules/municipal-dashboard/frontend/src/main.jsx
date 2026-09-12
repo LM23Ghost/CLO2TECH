@@ -196,6 +196,16 @@ function AddressAutocomplete({ value, onChange, onPlace }) {
 	return <><input ref={inputRef} required value={value} onChange={(event) => onChange(event.target.value)} placeholder={apiKey ? 'Search and select a street address' : 'Street name or address'} />{apiKey ? <small className="field-hint">Select a result to pin the exact address.</small> : <small className="field-hint">Add VITE_GOOGLE_MAPS_API_KEY to enable address search.</small>}</>;
 }
 
+function CommunityDialog({ report, onClose, onSaved }) {
+	const [community, setCommunity] = React.useState(null);
+	const [message, setMessage] = React.useState('');
+	const [name, setName] = React.useState('');
+	React.useEffect(() => { fetch(`${api}/citizen/reports/${report.id}/community`).then((response) => response.json()).then((payload) => setCommunity(payload.data)); }, [report.id]);
+	const verify = async (verdict) => { await fetch(`${api}/citizen/reports/${report.id}/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ verdict }) }); onSaved(); };
+	const comment = async (event) => { event.preventDefault(); await fetch(`${api}/citizen/reports/${report.id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, message }) }); setMessage(''); setName(''); const response = await fetch(`${api}/citizen/reports/${report.id}/community`); setCommunity((await response.json()).data); };
+	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="dialog community-dialog"><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Community check</p><h2>{report.category}</h2><p className="dialog-note">{report.street} · {report.location}</p><div className="verification-actions"><button onClick={() => verify('resolved')}>✓ Confirm resolved</button><button onClick={() => verify('still_not_resolved')}>! Still not resolved</button></div>{community && <div className="community-summary"><span>{community.confirmed} people confirmed resolved</span><span>{community.unresolved} still unresolved</span></div>}<div className="community-comments">{community?.comments?.map((item, index) => <div className="community-comment" key={`${item.createdAt}-${index}`}><strong>{item.name}</strong><p>{item.message}</p></div>)}</div><form onSubmit={comment}><label>Name <span>optional</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Resident" /></label><label>Share what you see<textarea required rows="3" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Is the issue still present in your street?" /></label><button className="submit" type="submit">Post observation <span>→</span></button></form></div></div>;
+}
+
 function MapView({ area, points }) {
 	const mapRef = React.useRef(null);
 
@@ -218,6 +228,7 @@ function App() {
 	const [selectedArea, setSelectedArea] = React.useState('all');
 	const [heatmap, setHeatmap] = React.useState([]);
 	const [showForm, setShowForm] = React.useState(false);
+	const [communityReport, setCommunityReport] = React.useState(null);
 	const [showAuth, setShowAuth] = React.useState(false);
 	const [showMunicipality, setShowMunicipality] = React.useState(false);
 	const [showMunicipalityUpdates, setShowMunicipalityUpdates] = React.useState(false);
@@ -225,6 +236,7 @@ function App() {
 	const [user, setUser] = React.useState(null);
 	const [municipalityToken, setMunicipalityToken] = React.useState(() => localStorage.getItem('cloud2tech_municipality_token'));
 	const [now, setNow] = React.useState(Date.now());
+	const [locationSuggestion, setLocationSuggestion] = React.useState(null);
 	const [photos, setPhotos] = React.useState([]);
 	const [photoPreviews, setPhotoPreviews] = React.useState([]);
 	const [error, setError] = React.useState('');
@@ -245,6 +257,19 @@ function App() {
 	}, []);
 	React.useEffect(() => { refresh(); }, [selectedArea]);
 	React.useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
+	React.useEffect(() => {
+		if (!areas.length || !navigator.geolocation) return;
+		navigator.geolocation.getCurrentPosition(({ coords }) => {
+			const candidates = areas.filter((area) => area.level === 'neighbourhood');
+			const nearest = candidates.reduce((closest, area) => { const distance = Math.hypot(coords.latitude - area.latitude, coords.longitude - area.longitude); return !closest || distance < closest.distance ? { area, distance } : closest; }, null)?.area;
+			if (!nearest || nearest.id === selectedArea) return;
+			const key = 'cloud2tech_observed_area';
+			const previous = JSON.parse(localStorage.getItem(key) ?? 'null');
+			const observedAt = previous?.areaId === nearest.id ? previous.observedAt : Date.now();
+			localStorage.setItem(key, JSON.stringify({ areaId: nearest.id, observedAt }));
+			if (Date.now() - observedAt >= 12 * 60 * 60 * 1000) setLocationSuggestion(nearest);
+		}, () => undefined, { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 5000 });
+	}, [areas, selectedArea]);
 
 	const selectArea = async (areaId) => {
 		setSelectedArea(areaId);
@@ -303,11 +328,13 @@ function App() {
 		<nav><span className="logo">CLOUD2TECH</span><AreaPicker areas={areas} selectedArea={selectedArea} onSelect={selectArea} /><div className="nav-actions"><button className="console-link" type="button" onClick={openMunicipality}>▦ Municipality</button>{municipalityToken && <button className="console-link" type="button" onClick={openMunicipalityUpdates}>↗ Updates</button>}{user ? <div className="account-menu"><button className="account-button" type="button" onClick={logout}><span className="avatar">{user.name.slice(0, 1).toUpperCase()}</span><span>{user.name.split(' ')[0]}</span><small>Sign out</small></button></div> : <button className="login-button" type="button" onClick={() => setShowAuth(true)}>Sign in</button>}<button className="report" onClick={() => setShowForm(true)}>+ Report an issue</button></div></nav>
 		{showMunicipality && <MunicipalityConsole token={municipalityToken} onClose={() => setShowMunicipality(false)} onSignOut={municipalitySignOut} />}
 		{showMunicipalityUpdates && <MunicipalityUpdatePanel token={municipalityToken} onClose={() => setShowMunicipalityUpdates(false)} />}
+		{locationSuggestion && <div className="location-suggestion"><div><strong>You appear to be in {locationSuggestion.name}.</strong><span>Want to view local service reports?</span></div><button onClick={() => { selectArea(locationSuggestion.id); setLocationSuggestion(null); }}>Switch area</button><button className="dismiss" onClick={() => setLocationSuggestion(null)}>Keep current</button></div>}
 		<section className="intro"><div><p className="eyebrow">{selectedAreaDetails.subtitle}</p><h1>{selectedAreaDetails.name === 'All service areas' ? <>Make the work<br /><span>visible.</span></> : <>{selectedAreaDetails.name}<br /><span>in view.</span></>}</h1><p className="lede">A shared operating picture for residents and the teams responsible for keeping {selectedAreaDetails.name.toLowerCase()} moving.</p></div><div className="live"><span className="pulse" /> Live operations desk <small>Updated just now</small></div></section>
 		<section className="metrics"><div><strong>{summary.open}</strong><span>Open reports</span></div><div><strong>{summary.inProgress}</strong><span>In progress</span></div><div><strong>{summary.resolved}</strong><span>Resolved</span></div><div><strong>{summary.averageResolutionHours ? `${summary.averageResolutionHours}h` : '—'}</strong><span>Avg. resolution time</span></div></section>
-		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p>{report.reason && <small className="report-reason">Reason: {report.reason}</small>}{report.updates?.[0] && <small className="report-update">Update: {report.updates[0].message}</small>}<small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span></article>)}</div></section>
+		<section className="workspace"><div><div className="map-heading"><span>LIVE MAP · OPENSTREETMAP</span><small>{selectedAreaDetails.name}</small></div><MapView area={selectedAreaDetails} points={heatmap} /></div><div className="reports"><div className="section-heading"><div><p className="eyebrow">Operations queue</p><h2>Latest reports</h2></div><span className="area-count">{reports.length} reports</span></div>{reports.map((report) => <article className="report-row" key={report.id}><span className={`category ${report.category.toLowerCase().replace(' ', '-')}`} /><div><strong>{report.category}</strong><p>{report.street} · {report.location} · {report.id}</p>{report.reason && <small className="report-reason">Reason: {report.reason}</small>}{report.updates?.[0] && <small className="report-update">Update: {report.updates[0].message}</small>}<small className="timer">{report.status === 'resolved' ? `${report.resolvedHours}h to resolve` : `Open for ${formatElapsed(report.loggedAt, now)}`}</small></div><span className={`status ${report.status}`}>{report.status.replace('_', ' ')}</span><button className="community-button" onClick={() => setCommunityReport(report)}>Community check</button></article>)}</div></section>
 		<footer>Cloud2Tech Civic Systems <span>Transparency by default</span></footer>
 		{showAuth && <AuthDialog areas={areas} onAuthenticated={handleAuthenticated} onClose={() => setShowAuth(false)} />}
+		{communityReport && <CommunityDialog report={communityReport} onClose={() => setCommunityReport(null)} onSaved={() => { setCommunityReport(null); refresh(); }} />}
 		{showMunicipalityAuth && <MunicipalityLogin onAuthenticated={handleMunicipalityAuthenticated} onClose={() => setShowMunicipalityAuth(false)} />}
 		{showForm && <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && closeForm()}><form className="dialog" onSubmit={submitReport}><button type="button" className="close" onClick={closeForm}>×</button><p className="eyebrow">Citizen report</p><h2>What needs attention?</h2><label>Service area<select value={form.area} onChange={(event) => setForm({ ...form, area: event.target.value })}>{areas.filter((area) => area.id !== 'all').map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label><label>Issue type<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Water leak</option><option>Pothole</option><option>Electricity outage</option><option>Street light</option></select></label><label>Street address<AddressAutocomplete value={form.street} onChange={(street) => setForm({ ...form, street })} onPlace={({ latitude, longitude }) => setForm({ ...form, latitude, longitude })} /></label><label>Suburb or landmark<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="Optional location detail" /></label><label className="photo-picker">Photos <span>up to 3 · 5MB each</span><input type="file" accept="image/*" multiple onChange={handlePhotos} /><div className="photo-previews">{photoPreviews.map((preview, index) => <img key={preview} src={preview} alt={`Selected upload ${index + 1}`} />)}</div></label>{error && <p className="form-error">{error}</p>}<button className="submit" type="submit">Submit report <span>→</span></button></form></div>}
 	</main>;
