@@ -1,0 +1,19 @@
+{
+  "name": "cloud2tech",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloud-first IT services platform for South African SMEs, schools, and municipalities.",
+  "workspaces": ["modules/*"],
+  "scripts": {
+    "dev:sme": "npm --workspace sme-hub run dev",
+    "dev:school": "npm --workspace school-platform run dev",
+    "dev:municipal": "npm --workspace municipal-dashboard run dev",
+    "build": "npm run build:sme && npm run build:school && npm run build:municipal",
+    "build:sme": "npm --workspace sme-hub run build",
+    "build:school": "npm --workspace school-platform run build",
+    "build:municipal": "npm --workspace municipal-dashboard run build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
