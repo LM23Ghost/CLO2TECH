@@ -40,6 +40,7 @@
 | --- | --- | --- |
 | GET | `/api/v1/health` | Service health check |
 | POST | `/api/v1/citizen/reports` | Submit a geotagged service report |
+| POST | `/api/v1/municipality/reports/:id/updates` | Publish a scoped report status, reason, and resident-facing update |
 | GET | `/api/v1/dashboard/summary` | Read SLA and status summary |
 | GET | `/api/v1/dashboard/heatmap` | Read map aggregation data |
 | POST | `/api/v1/workflow/route` | Route a report to a department |
@@ -47,4 +48,4 @@
 | GET | `/api/v1/municipality/research` | Read aggregate research data, area/category breakdowns, and report register |
 | POST | `/api/v1/municipality/notifications/broadcast` | Queue an email notification for all registered residents |
 
-Municipal report records include `loggedAt` (ISO 8601 UTC). Open reports expose elapsed time from `loggedAt`; resolved reports include `resolvedHours`. Municipality work accounts must select an assigned jurisdiction during login. `MUNICIPALITY_WORK_AREAS` controls those assignments in development, and the token carries the selected scope; research and broadcast queries are filtered server-side to that scope. Replace this gate with Microsoft Entra work-account groups or claims in production. Broadcasts currently enter an in-memory queue and return the recipient count for the assigned area. Connect the queue to Azure Communication Services, SendGrid, or another SMTP provider for production delivery.
+Municipal report records include `loggedAt` (ISO 8601 UTC), `reason`, and an `updates` history. Open reports expose elapsed time from `loggedAt`; resolved reports include `resolvedHours`. `Electricity outage` is a supported citizen report category. Municipality work accounts must select an assigned jurisdiction during login. `MUNICIPALITY_WORK_AREAS` controls those assignments in development, and the token carries the selected scope; research, updates, and broadcast queries are filtered server-side to that scope. Replace this gate with Microsoft Entra work-account groups or claims in production. Broadcasts currently enter an in-memory queue and return the recipient count for the assigned area. Connect the queue to Azure Communication Services, SendGrid, or another SMTP provider for production delivery.

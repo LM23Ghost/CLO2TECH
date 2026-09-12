@@ -21,13 +21,13 @@ const upload = multer({
 const reports = [
 	{ id: 'RPT-1042', area: 'mfuleni', street: 'Mfuleni North', category: 'Water leak', location: 'Mfuleni North', latitude: -33.997, longitude: 18.684, status: 'in_progress', priority: 'high', loggedAt: new Date(Date.now() - 2.4 * 3600000).toISOString(), photos: [] },
 	{ id: 'RPT-1041', area: 'bellville-south', street: 'Voortrekker Road', category: 'Pothole', location: 'Bellville South', latitude: -33.912, longitude: 18.631, status: 'received', priority: 'normal', loggedAt: new Date(Date.now() - 4.1 * 3600000).toISOString(), photos: [] },
-	{ id: 'RPT-1038', area: 'khayelitsha', street: 'Mew Way', category: 'Power outage', location: 'Ward 7', latitude: -34.041, longitude: 18.674, status: 'resolved', resolvedHours: 12.5, priority: 'high', loggedAt: new Date(Date.now() - 29 * 3600000).toISOString(), photos: [] },
-	{ id: 'RPT-1037', area: 'khayelitsha', street: 'Walter Sisulu Drive', category: 'Street light', location: 'Site B', latitude: -34.035, longitude: 18.667, status: 'in_progress', priority: 'normal', loggedAt: new Date(Date.now() - 20 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1038', area: 'khayelitsha', street: 'Mew Way', category: 'Electricity outage', location: 'Ward 7', latitude: -34.041, longitude: 18.674, status: 'resolved', resolvedHours: 12.5, reason: 'Planned substation maintenance', loggedAt: new Date(Date.now() - 29 * 3600000).toISOString(), updates: [{ message: 'Power restored after planned substation maintenance.', createdAt: new Date(Date.now() - 16.5 * 3600000).toISOString() }], photos: [] },
+	{ id: 'RPT-1037', area: 'khayelitsha', street: 'Walter Sisulu Drive', category: 'Street light', location: 'Site B', latitude: -34.035, longitude: 18.667, status: 'in_progress', priority: 'normal', loggedAt: new Date(Date.now() - 20 * 3600000).toISOString(), updates: [], photos: [] },
 	{ id: 'RPT-1036', area: 'delft', street: 'The Hague Avenue', category: 'Water leak', location: 'The Hague', latitude: -33.981, longitude: 18.644, status: 'received', priority: 'high', loggedAt: new Date(Date.now() - 23 * 3600000).toISOString(), photos: [] },
 	{ id: 'RPT-1035', area: 'mitchells-plain', street: 'AZ Berman Drive', category: 'Pothole', location: 'Mitchells Plain', latitude: -34.052, longitude: 18.605, status: 'resolved', resolvedHours: 24, priority: 'normal', loggedAt: new Date(Date.now() - 51 * 3600000).toISOString(), photos: [] },
-	{ id: 'RPT-1034', area: 'sandton', street: 'Rivonia Road', category: 'Pothole', location: 'Sandton', latitude: -26.107, longitude: 28.056, status: 'in_progress', priority: 'normal', loggedAt: new Date(Date.now() - 7.2 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1034', area: 'sandton', street: 'Rivonia Road', category: 'Electricity outage', location: 'Sandton', latitude: -26.107, longitude: 28.056, status: 'in_progress', priority: 'high', reason: 'Unplanned network fault under investigation', loggedAt: new Date(Date.now() - 7.2 * 3600000).toISOString(), updates: [{ message: 'A field crew has been dispatched to investigate the feeder fault.', createdAt: new Date(Date.now() - 1.2 * 3600000).toISOString() }], photos: [] },
 	{ id: 'RPT-1033', area: 'parkhurst', street: 'Sixth Street', category: 'Street light', location: 'Parkhurst', latitude: -26.124, longitude: 28.013, status: 'received', priority: 'normal', loggedAt: new Date(Date.now() - 15 * 3600000).toISOString(), photos: [] },
-	{ id: 'RPT-1032', area: 'sandton', street: 'Grayston Drive', category: 'Water leak', location: 'Sandton Central', latitude: -26.107, longitude: 28.062, status: 'resolved', resolvedHours: 8, priority: 'high', loggedAt: new Date(Date.now() - 33 * 3600000).toISOString(), photos: [] },
+	{ id: 'RPT-1032', area: 'sandton', street: 'Grayston Drive', category: 'Water leak', location: 'Sandton Central', latitude: -26.107, longitude: 28.062, status: 'resolved', resolvedHours: 8, priority: 'high', loggedAt: new Date(Date.now() - 33 * 3600000).toISOString(), updates: [], photos: [] },
 ];
 
 const users = [];
@@ -103,7 +103,7 @@ app.patch('/api/v1/auth/profile', requireUser, (req, res) => {
 app.get('/api/v1/citizen/reports', (req, res) => res.json({ data: reportsForArea(req.query.area) }));
 app.post('/api/v1/citizen/reports', upload.array('photos', 3), (req, res) => {
 	const area = areas.find((item) => item.id === req.body.area) ?? areas[1];
-	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: area.latitude, longitude: area.longitude, status: 'received', resolvedHours: null, priority: 'normal', loggedAt: new Date().toISOString(), photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
+	const report = { id: `RPT-${1043 + reports.length}`, area: area.id, street: req.body.street ?? 'Unspecified street', category: req.body.category ?? 'Other', location: req.body.location ?? area.name, latitude: area.latitude, longitude: area.longitude, status: 'received', resolvedHours: null, reason: '', priority: 'normal', loggedAt: new Date().toISOString(), updates: [], photos: (req.files ?? []).map((file) => ({ name: file.originalname, size: file.size, type: file.mimetype, path: `/uploads/${file.filename}` })) };
 	reports.unshift(report);
 	res.status(201).json({ data: report });
 });
@@ -111,8 +111,21 @@ app.patch('/api/v1/citizen/reports/:id/status', (req, res) => {
 	const report = reports.find((item) => item.id === req.params.id);
 	if (!report) return res.status(404).json({ error: 'Report not found' });
 	report.status = req.body.status ?? report.status;
+	if (typeof req.body.reason === 'string') report.reason = req.body.reason.trim();
 	if (report.status === 'resolved' && !report.resolvedHours) report.resolvedHours = Number(req.body.resolvedHours) || 18.4;
+	if (typeof req.body.message === 'string' && req.body.message.trim()) report.updates = [{ message: req.body.message.trim(), createdAt: new Date().toISOString() }, ...(report.updates ?? [])];
 	res.json({ data: report });
+});
+app.post('/api/v1/municipality/reports/:id/updates', requireMunicipality, (req, res) => {
+	const report = reports.find((item) => item.id === req.params.id);
+	if (!report || !reportsForArea(req.municipality.areaId).includes(report)) return res.status(404).json({ error: 'Report not found in your jurisdiction.' });
+	if (!req.body.message?.trim()) return res.status(400).json({ error: 'An update message is required.' });
+	if (req.body.reason !== undefined) report.reason = String(req.body.reason).trim();
+	if (req.body.status) report.status = req.body.status;
+	if (report.status === 'resolved' && !report.resolvedHours) report.resolvedHours = Number(req.body.resolvedHours) || 18.4;
+	const update = { message: req.body.message.trim(), createdAt: new Date().toISOString() };
+	report.updates = [update, ...(report.updates ?? [])];
+	res.status(201).json({ data: { report, update } });
 });
 app.get('/api/v1/dashboard/summary', (req, res) => {
 	const scopedReports = reportsForArea(req.query.area);
