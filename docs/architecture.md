@@ -56,3 +56,5 @@ Municipal report records include `loggedAt` (ISO 8601 UTC), `reason`, and an `up
 Residents can submit and view reports but cannot change report status; status/reason updates require a municipality-scoped token. Street entry uses Google Places Autocomplete when `VITE_GOOGLE_MAPS_API_KEY` is configured and falls back to a normal address field for local development. The All service areas map fits its viewport to all active report markers.
 
 Community verification is intentionally advisory: a `still_not_resolved` vote reopens the report for municipal review, while observations and confirmation counts remain visible alongside the report. Browser location is also advisory; after the device is observed in another known area for 12 hours, the app asks whether to switch views and never changes the selected area silently.
+
+The municipality operations console provides server-generated community counts and consolidates open reports by area, category, and street. Its search and status filters operate on the scoped report set so large queues remain usable without endless scrolling.
