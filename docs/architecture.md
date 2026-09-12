@@ -62,3 +62,5 @@ Community verification is intentionally advisory: a `still_not_resolved` vote re
 The municipality operations console provides server-generated community counts and consolidates open reports by area, category, and street. Its search and status filters operate on the scoped report set so large queues remain usable without endless scrolling.
 
 Area chat is scoped to the selected area. Official municipality notices posted at a province or municipality level are inherited by descendant areas, so a Gauteng notice can appear for Sandton residents without exposing unrelated jurisdictions.
+
+When a municipality token is active, area-chat posts are assigned `author=Municipality` and `role=official` by the server; the client cannot impersonate that role. The dashboard polls report data every 15 seconds and the open chat feed every 10 seconds. Municipality staff mark a report resolved from the Updates workspace by selecting `Resolved`, entering a reason, and publishing a resident-facing message.
