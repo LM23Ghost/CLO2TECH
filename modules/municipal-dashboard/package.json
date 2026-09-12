@@ -2,7 +2,22 @@
   "name": "municipal-dashboard",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"", "dev:api": "node server/index.js", "dev:web": "vite frontend --host 0.0.0.0", "build": "vite build frontend" },
-  "dependencies": { "cors": "^2.8.5", "express": "^5.1.0" },
-  "devDependencies": { "concurrently": "^9.2.1", "vite": "^7.1.5", "react": "^19.1.1", "react-dom": "^19.1.1" }
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "node server/index.js",
+    "dev:web": "vite frontend --host 0.0.0.0",
+    "build": "vite build frontend"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "leaflet": "^1.9.4",
+    "multer": "^2.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "vite": "^7.1.5"
+  }
 }
