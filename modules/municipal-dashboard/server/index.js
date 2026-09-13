@@ -162,11 +162,12 @@ const areas = [
 
 const childAreaIds = (areaId) => areas.filter((area) => area.parentId === areaId).flatMap((area) => [area.id, ...childAreaIds(area.id)]);
 const parentAreaIds = (areaId) => { const area = areas.find((item) => item.id === areaId); return area?.parentId ? [area.parentId, ...parentAreaIds(area.parentId)] : []; };
+const configuredMunicipalityScopes = [...new Set(configuredMunicipalityAreas.flatMap((area) => [area, ...childAreaIds(area)]))];
 const reportsForArea = (area) => area && area !== 'all' ? reports.filter((report) => [area, ...childAreaIds(area)].includes(report.area)) : reports;
 
 app.get('/api/v1/health', (_req, res) => res.json({ service: 'municipal-dashboard', status: 'ok' }));
 app.get('/api/v1/areas', (_req, res) => res.json({ data: areas }));
-app.get('/api/v1/municipality/auth/options', (_req, res) => res.json({ data: { areas: areas.filter((area) => configuredMunicipalityAreas.includes(area.id)) } }));
+app.get('/api/v1/municipality/auth/options', (_req, res) => res.json({ data: { areas: areas.filter((area) => configuredMunicipalityScopes.includes(area.id)) } }));
 app.post('/api/v1/auth/signup', (req, res) => {
 	const { name, email, password, phone, preferredArea = 'all' } = req.body;
 	if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });
@@ -188,7 +189,7 @@ app.post('/api/v1/auth/login', (req, res) => {
 });
 app.post('/api/v1/municipality/auth/login', (req, res) => {
 	if (req.body.email?.toLowerCase() !== municipalityEmail.toLowerCase() || req.body.password !== municipalityPassword) return res.status(401).json({ error: 'Municipality work email or password is incorrect.' });
-	if (!configuredMunicipalityAreas.includes(req.body.area)) return res.status(403).json({ error: 'That work account is not assigned to this service area.' });
+	if (!configuredMunicipalityScopes.includes(req.body.area)) return res.status(403).json({ error: 'That work account is not assigned to this service area.' });
 	const token = crypto.randomUUID();
 	municipalitySessions.set(token, { email: municipalityEmail, role: 'municipality', areaId: req.body.area });
 	res.json({ data: { token, user: { email: municipalityEmail, role: 'municipality', areaId: req.body.area } } });
