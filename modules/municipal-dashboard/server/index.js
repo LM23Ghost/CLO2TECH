@@ -44,7 +44,7 @@ const getUser = (req) => sessions.get(req.headers.authorization?.replace('Bearer
 const requireUser = (req, res, next) => { const user = getUser(req); if (!user) return res.status(401).json({ error: 'Please sign in to continue.' }); req.user = user; next(); };
 const municipalityEmail = process.env.MUNICIPALITY_WORK_EMAIL || 'municipality@cloud2tech.local';
 const municipalityPassword = process.env.MUNICIPALITY_WORK_PASSWORD || 'demo-municipality';
-const configuredMunicipalityAreas = (process.env.MUNICIPALITY_WORK_AREAS || 'gauteng').split(',').map((area) => area.trim()).filter(Boolean);
+const configuredMunicipalityAreas = (process.env.MUNICIPALITY_WORK_AREAS || 'gauteng,western-cape').split(',').map((area) => area.trim()).filter(Boolean);
 const requireMunicipality = (req, res, next) => { const session = municipalitySessions.get(req.headers.authorization?.replace('Bearer ', '')); if (!session) return res.status(401).json({ error: 'Municipality work-account access is required.' }); req.municipality = session; next(); };
 
 const areas = [
