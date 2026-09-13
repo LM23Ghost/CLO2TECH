@@ -167,7 +167,7 @@ const reportsForArea = (area) => area && area !== 'all' ? reports.filter((report
 
 app.get('/api/v1/health', (_req, res) => res.json({ service: 'municipal-dashboard', status: 'ok' }));
 app.get('/api/v1/areas', (_req, res) => res.json({ data: areas }));
-app.get('/api/v1/municipality/auth/options', (_req, res) => res.json({ data: { areas: areas.filter((area) => configuredMunicipalityScopes.includes(area.id)) } }));
+app.get('/api/v1/municipality/auth/options', (_req, res) => res.json({ data: { areas: areas.map((area) => ({ ...area, allowed: configuredMunicipalityScopes.includes(area.id) })) } }));
 app.post('/api/v1/auth/signup', (req, res) => {
 	const { name, email, password, phone, preferredArea = 'all' } = req.body;
 	if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required.' });

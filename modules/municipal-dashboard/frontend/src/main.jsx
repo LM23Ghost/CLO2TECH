@@ -86,7 +86,7 @@ function MunicipalityLogin({ onAuthenticated, onClose }) {
 	const [areas, setAreas] = React.useState([]);
 	const [area, setArea] = React.useState('');
 	const [error, setError] = React.useState('');
-	React.useEffect(() => { fetch(`${api}/municipality/auth/options`).then((response) => response.json()).then((payload) => { setAreas(payload.data.areas); setArea(payload.data.areas[0]?.id ?? ''); }); }, []);
+	React.useEffect(() => { fetch(`${api}/municipality/auth/options`).then((response) => response.json()).then((payload) => { setAreas(payload.data.areas); setArea(payload.data.areas.find((item) => item.allowed)?.id ?? ''); }); }, []);
 	const submit = async (event) => {
 		event.preventDefault();
 		const response = await fetch(`${api}/municipality/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, area }) });
@@ -94,7 +94,7 @@ function MunicipalityLogin({ onAuthenticated, onClose }) {
 		if (!response.ok) { setError(payload.error ?? 'Could not sign in.'); return; }
 		onAuthenticated(payload.data);
 	};
-	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog auth-dialog" onSubmit={submit}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Municipality work account</p><h2>Research access.</h2><p className="dialog-note">Choose your assigned jurisdiction. Your account can only see and contact residents in that area.</p><label>Work email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@municipality.gov.za" /></label><label>Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Work account password" /></label><label>Assigned area<select required value={area} onChange={(event) => setArea(event.target.value)}>{areas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={!area} type="submit">Open console <span>→</span></button></form></div>;
+	return <div className="overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><form className="dialog auth-dialog" onSubmit={submit}><button type="button" className="close" onClick={onClose}>×</button><p className="eyebrow">Municipality work account</p><h2>Research access.</h2><p className="dialog-note">All service areas are listed. Your work account can only open assigned areas.</p><label>Work email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@municipality.gov.za" /></label><label>Password<input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Work account password" /></label><label>Assigned area<select required value={area} onChange={(event) => setArea(event.target.value)}>{areas.map((item) => <option key={item.id} value={item.id} disabled={!item.allowed}>{item.allowed ? `${item.name} · assigned` : `${item.name} · not assigned`}</option>)}</select></label>{error && <p className="form-error">{error}</p>}<button className="submit" disabled={!area} type="submit">Open console <span>→</span></button></form></div>;
 }
 
 function NotificationDialog({ recipientCount, token, onClose, onSent }) {
