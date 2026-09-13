@@ -53,7 +53,7 @@ function AreaPicker({ areas, selectedArea, onSelect }) {
 	return <div className="area-picker" ref={pickerRef}>
 		<span className="area-label">Viewing</span>
 		<button className={`area-trigger ${open ? 'is-open' : ''}`} type="button" aria-haspopup="listbox" aria-expanded={open} onClick={toggle}>
-			<span><strong>{selected?.name ?? 'Choose an area'}</strong><small>{selected?.subtitle ?? 'Service area'}</small></span><span className="chevron">⌄</span>
+			<span><strong>{selected?.name ?? 'Choose an area'}</strong><small>{selected?.subtitle ?? 'Service area'}</small></span><span className="area-trigger-actions"><span className="area-trigger-search" aria-hidden="true">⌕</span><span className="chevron">⌄</span></span>
 		</button>
 		{open && <div className="area-menu" role="listbox" aria-label="Service areas">
 			<div className="area-search"><span>⌕</span><input autoFocus value={search} onChange={(event) => { setSearch(event.target.value); setBrowseParent(null); }} placeholder="Search area, city, or suburb" aria-label="Search areas" /></div>
