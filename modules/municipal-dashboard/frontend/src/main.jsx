@@ -2,9 +2,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { installDemoApi } from './demo-api';
 import './styles.css';
 
 const api = import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:4003/api/v1';
+if (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL?.trim()) installDemoApi(api);
 
 const formatElapsed = (timestamp, now = Date.now()) => {
 	if (!timestamp) return 'Time unavailable';
