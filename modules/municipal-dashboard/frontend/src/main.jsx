@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
 
-const api = 'http://localhost:4003/api/v1';
+const api = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4003/api/v1';
 
 const formatElapsed = (timestamp, now = Date.now()) => {
 	if (!timestamp) return 'Time unavailable';
