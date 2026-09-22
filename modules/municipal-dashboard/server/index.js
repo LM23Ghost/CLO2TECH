@@ -6,8 +6,9 @@ import multer from 'multer';
 import path from 'node:path';
 
 const app = express();
-const port = process.env.MUNICIPAL_API_PORT || 4003;
-app.use(cors());
+const port = process.env.PORT || process.env.MUNICIPAL_API_PORT || 4003;
+const allowedOrigins = (process.env.MUNICIPAL_ALLOWED_ORIGINS ?? 'http://localhost:5175,https://lm23ghost.github.io').split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 const uploadDirectory = path.join(process.cwd(), 'server', 'uploads');

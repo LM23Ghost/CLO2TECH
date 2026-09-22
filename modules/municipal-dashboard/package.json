@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "node server/index.js",
+    "start": "node server/index.js",
     "dev:web": "vite frontend --host 0.0.0.0",
     "build": "vite build frontend"
   },
